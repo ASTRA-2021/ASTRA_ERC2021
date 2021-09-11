@@ -1,0 +1,27 @@
+<launch>
+  <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true">
+    <!-- <rosparam command="load" file="$(find robot_localization)/params/ekf_template.yaml" /> -->
+    <param name="map_frame" value="map"/>
+    <param name="odom_frame" value="odom"/>
+    <param name="base_link_frame" value="base_footprint"/>
+    <param name="world_frame" value="odom"/>
+
+    <param name="odom0" value="/wheel/odom"/>
+    <param name="odom1" value="/zed2/odom"/>
+    <param name="pose0" value="/altitude"/>
+    <param name="pose1" value="/some/other/pose"/>
+    <param name="pose2" value="/yet/another/pose"/>
+    <param name="twist0" value="/optical_flow"/>
+    <param name="imu0" value="/imu/left"/>
+    <param name="imu1" value="/imu/right"/>
+    <param name="imu2" value="/imu/front"/>
+    <param name="imu3" value="/imu/back"/>
+
+   <!--  Placeholder for output topic remapping
+     You either remap on this node, the node that takes in the data, or both!
+     <remap from="odometry/filtered" to=""/>
+     <remap from="accel/filtered" to=""/>
+     -->
+
+  </node>
+</launch>
