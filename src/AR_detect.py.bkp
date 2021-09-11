@@ -2,9 +2,10 @@
 import rospy
 import tf2_ros
 import tf2_geometry_msgs
+import tf2_msgs.msg
 from ar_track_alvar_msgs.msg import AlvarMarkers
 from std_msgs.msg import String, ColorRGBA
-from geometry_msgs.msg import PointStamped, Point, Pose
+from geometry_msgs.msg import PointStamped, Point, Pose, TransformStamped
 from visualization_msgs.msg import Marker
 
 
@@ -28,7 +29,6 @@ waypoints = {1: [4.2, -4.9, 0],
              3: [-10.08, 10.32, 0],
              4: [12.5, -1.9, 0]}
 
-
 class DrawMarker():
     def __init__(self):
         self.fiducial_marker_topic = '/ar_pose_marker'
@@ -36,6 +36,8 @@ class DrawMarker():
         self.node_name = 'marker_draw_node'
         self.marker_pub = rospy.Publisher(self.marker_topic, Marker,
                                           queue_size=10)
+        self.pub_tf = rospy.Publisher("/tf", tf2_msgs.msg.TFMessage,
+                                      queue_size=1)
         self.ar_sub = rospy.Subscriber(self.fiducial_marker_topic,
                                        AlvarMarkers, self.artag_callback)
 
@@ -78,23 +80,48 @@ class DrawMarker():
         robotMarker.lifetime = rospy.Duration(0)
         self.marker_pub.publish(robotMarker)
 
+    def connector(self, ar_frame, lm_frame):
+
+        print("connector...")
+        tf_buffer = tf2_ros.Buffer()
+        listener = tf2_ros.TransformListener(tf_buffer)
+
+        (trans, rot) = tf_buffer.lookup_transform('zed2_left_camera_optical_frame', ar_frame, rospy.Time(0))
+        try:
+            (trans, rot) = tf_buffer.lookup_transform('zed2_left_camera_optical_frame', ar_frame, rospy.Time(0))
+            print("lookup_transform...")
+            t = TransformStamped()
+            t.header.frame_id = 'zed2_left_camera_optical_frame'
+            t.header.stamp = rospy.Time.now()
+            t.child_frame_id = lm_frame
+            t.transform.translation = trans
+            t.transform.rotation = rot
+            tfm = tf2_msgs.msg.TFMessage([t])
+            self.pub_tf.publish(tfm)
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException, tf2_ros.ExtrapolationException):
+            pass
+
     def artag_callback(self, msg):
         # Identify which landmark is associated with the first marker
         try:
             visible_marker_id = msg.markers[0].id
             visible_marker_pose = msg.markers[0].pose
+            # visible_marker_pose = self.invert(visible_marker_pose)
+            ar_frame = "ar_marker_" + str(visible_marker_id)
+            lm_frame = "lm_frame_" + str(visible_marker_id)
+            self.connector(ar_frame, lm_frame)
 
             for id, position in landmarks.items():
                 if (id != visible_marker_id):
                     transformed_pose = self.transform_pose(visible_marker_pose,
-                                                    ("lm_"+str(visible_marker_id)+"_frame"),
-                                                    ("lm_"+str(id)+"_frame"))
+                                                           lm_frame,
+                                                           "lm_frame_"+str(id))
                     self.draw_mark(transformed_pose, id, marker_type="landmark")
 
             for idx, position in waypoints.items():
                 transformed_pose = self.transform_pose(visible_marker_pose,
-                                                ("lm_"+str(visible_marker_id)+"_frame"),
-                                                ("wp_"+str(idx)+"_frame"))
+                                                       lm_frame,
+                                                       "wp_frame_"+str(idx))
                 self.draw_mark(transformed_pose, idx, marker_type="waypoint")
         except IndexError:
             rospy.logerr("No markers found")
